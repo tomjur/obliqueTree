@@ -122,6 +122,15 @@ class TreeClassifier:
     def predict_stochastic(self, data, depth=-1):
         return self.root.predict_stochastic(data, depth)
 
+    def print_tree(self, node=None, level=0):
+        if node is None:
+            node = self.root
+        res = "\t"*level + str(node.m) + '/' + str(node.weight) + '\n'
+        if not node.is_leaf:
+            res += self.print_tree(node.left, level+1)
+            res += self.print_tree(node.right, level+1)
+        return res
+
 if __name__ == "__main__":
     # from sklearn.datasets import make_blobs
     # create fake data
@@ -130,18 +139,18 @@ if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
 
-    def create_data():
+    def create_data_simulation():
         X1 = np.random.multivariate_normal([1.0,1.0], [[0.05,0.0],[0.0,0.05]], size = 50)
         y1 = np.ones([50,])
         X2 = np.random.multivariate_normal([-1.0,-1.0], [[0.05,0.0],[0.0,0.05]], size = 50)
         y2 = np.ones([50,])
-        # X3 = np.random.multivariate_normal([0.0,0.0], [[0.05,0.0],[0.0,0.05]], size = 50)
-        X3 = np.random.multivariate_normal([-3.0,3.0], [[0.05,0.0],[0.0,0.05]], size = 50)
+        X3 = np.random.multivariate_normal([0.0,0.0], [[0.05,0.0],[0.0,0.05]], size = 50)
+        # X3 = np.random.multivariate_normal([-3.0,3.0], [[0.05,0.0],[0.0,0.05]], size = 50)
         y3 = np.zeros([50,])
         return np.concatenate([X1,X2,X3], axis =0), np.concatenate([y1,y2,y3], axis =0)
 
 
-    X, y = create_data()
+    X, y = create_data_simulation()
     treeClassifier = TreeClassifier(0.05, 5, normalizer_mode="norm", feature_drop_probability=0.0)
     # treeClassifier = TreeClassifier(0.05, 10, normalizer_mode="range", feature_drop_probability=0.0)
     treeClassifier.create_tree(X,y)

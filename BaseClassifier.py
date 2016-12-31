@@ -23,9 +23,10 @@ class NormOneNormalizer(DataNormalizer):
 
     def __init__(self):
         super(NormOneNormalizer, self).__init__()
+        self.data_mean = None
 
-    @staticmethod
-    def normalize_data(data):
+    def normalize_data(self, data):
+        data = np.subtract(data, self.data_mean)
         res = np.concatenate((data, np.ones((data.shape[0], 1))), axis=1)
         row__squared_sums = np.square(res).sum(axis=1)
         res = res / row__squared_sums[:, np.newaxis]
@@ -35,6 +36,7 @@ class NormOneNormalizer(DataNormalizer):
         return self.normalize_data(data)
 
     def normalize_train(self, data):
+        self.data_mean = data.mean(axis=0)
         return self.normalize_data(data)
 
 
