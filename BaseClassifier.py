@@ -26,10 +26,17 @@ class NormOneNormalizer(DataNormalizer):
         self.data_mean = None
 
     def normalize_data(self, data):
+        # subtract mean
         data = np.subtract(data, self.data_mean)
+        # add coordinate to match scale of data
         res = np.concatenate((data, np.ones((data.shape[0], 1))), axis=1)
-        row__squared_sums = np.square(res).sum(axis=1)
-        res = res / row__squared_sums[:, np.newaxis]
+        # normalize
+        row_squared_sums = np.reshape(np.sqrt(np.square(res).sum(axis=1)), (-1, 1))
+        res = np.divide(res, row_squared_sums)
+        # add bias coordinate
+        res = np.concatenate((res, np.ones((data.shape[0], 1))), axis=1)
+        # normalize
+        res = np.divide(res, np.sqrt(2.0))
         return res
 
     def normalize_test(self, data):
@@ -328,7 +335,7 @@ class BaseClassifier:
 
     def get_probabilities(self, data):
         normalized_data = self.normalizer.normalize_test(data[:, self.features_to_keep])
-        res = np.add(np.dot(normalized_data, self.w), 0.5)
+        res = np.multiply(np.add(np.dot(normalized_data, self.w), 1.0), 0.5)
         # make sure probabilities are in range
         res[np.less(res, 0.0)] = 0.0
         res[np.greater(res, 1.0)] = 1.0

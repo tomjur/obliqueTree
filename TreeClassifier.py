@@ -29,7 +29,11 @@ class TreeNode:
         if self.classifier is not None:
             return
         normalized_data_dist = np.divide(self.data_dist, self.weight)
-        self.classifier = BaseClassifier(self.epsilon, normalizer_mode=self.normalizer_mode,
+        normalized_epsilon = self.epsilon / self.weight
+        normalized_epsilon = np.min([0.5, normalized_epsilon, 10*self.epsilon])
+        # self.classifier = BaseClassifier(self.epsilon, normalizer_mode=self.normalizer_mode,
+        #                                  feature_drop_probability=self.feature_drop_probability)
+        self.classifier = BaseClassifier(normalized_epsilon, normalizer_mode=self.normalizer_mode,
                                          feature_drop_probability=self.feature_drop_probability)
         self.classifier.approximate_solver(self.data, self.labels, normalized_data_dist)
         self.gain = self.weight*(self.classifier.get_ginni(self.m) - self.classifier.g)
@@ -52,6 +56,8 @@ class TreeNode:
 
     def get_probabilities(self, data, depth=-1):
         if self.is_leaf or depth == 0:
+            # my_label = np.greater_equal(self.m, 0.5) * 1.0
+            # return np.multiply(np.ones((data.shape[0])), my_label)
             return np.multiply(np.ones((data.shape[0])), self.m)
         current_probabilities = self.classifier.get_probabilities(data)
         left = np.multiply(current_probabilities, self.left.get_probabilities(data, depth=depth - 1))
@@ -87,7 +93,7 @@ class TreeNode:
 
 class TreeClassifier:
 
-    def __init__(self, epsilon, number_of_iterations, normalizer_mode=None, feature_drop_probability = 0.0):
+    def __init__(self, epsilon, number_of_iterations, normalizer_mode=None, feature_drop_probability=0.0):
         # hyper parameters
         self.epsilon = epsilon
         self.number_of_iterations = number_of_iterations
@@ -97,19 +103,25 @@ class TreeClassifier:
         # model
         self.root = None
 
-    def create_tree(self, data, labels):
+    def fit(self, data, labels):
         # initial data distribution
         data_dist = np.ones(labels.shape) / data.shape[0]
         root = TreeNode(data, data_dist, labels, self.epsilon, self.normalizer_mode, self.feature_drop_probability)
         leaves = [root]
         for t in range(0, self.number_of_iterations):
+            print "iteration {} from {}".format(t, self.number_of_iterations)
             # get maximal gain (weighted)
             gains = [l.get_gain() for l in leaves]
             if np.less_equal(np.max(gains), 0.0):
+                print 'negative gain aborting, gains:'
+                print gains
                 break
             leaf_index = np.argmax(gains)
+            print "splitting leaf with weight {} and purity {}".format(leaves[leaf_index].weight, leaves[leaf_index].m)
             # set that leaf as internal and get the split
             l, r = leaves[leaf_index].set_as_internal()
+            print "l_child weight {} and purity {}".format(l.weight, l.m)
+            print "r_child weight {} and purity {}".format(r.weight, r.m)
             # remove now-internal-node from list of leaves
             leaves.pop(leaf_index)
             # add the newly discovered leaves as potential splits
@@ -121,6 +133,9 @@ class TreeClassifier:
 
     def predict_stochastic(self, data, depth=-1):
         return self.root.predict_stochastic(data, depth)
+
+    def score(self, data):
+        return self.predict_deterministic(data)
 
     def print_tree(self, node=None, level=0):
         if node is None:
@@ -144,16 +159,16 @@ if __name__ == "__main__":
         y1 = np.ones([50,])
         X2 = np.random.multivariate_normal([-1.0,-1.0], [[0.05,0.0],[0.0,0.05]], size = 50)
         y2 = np.ones([50,])
-        X3 = np.random.multivariate_normal([0.0,0.0], [[0.05,0.0],[0.0,0.05]], size = 50)
-        # X3 = np.random.multivariate_normal([-3.0,3.0], [[0.05,0.0],[0.0,0.05]], size = 50)
+        # X3 = np.random.multivariate_normal([0.0,0.0], [[0.05,0.0],[0.0,0.05]], size = 50)
+        X3 = np.random.multivariate_normal([-3.0,3.0], [[0.05,0.0],[0.0,0.05]], size = 50)
         y3 = np.zeros([50,])
         return np.concatenate([X1,X2,X3], axis =0), np.concatenate([y1,y2,y3], axis =0)
 
 
     X, y = create_data_simulation()
-    treeClassifier = TreeClassifier(0.05, 5, normalizer_mode="norm", feature_drop_probability=0.0)
+    treeClassifier = TreeClassifier(0.05, 20, normalizer_mode="norm", feature_drop_probability=0.0)
     # treeClassifier = TreeClassifier(0.05, 10, normalizer_mode="range", feature_drop_probability=0.0)
-    treeClassifier.create_tree(X,y)
+    treeClassifier.fit(X, y)
 
     x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
     y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
