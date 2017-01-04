@@ -1,4 +1,6 @@
 from BaseClassifier import *
+from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.metrics import accuracy_score
 import numpy as np
 
 
@@ -91,9 +93,9 @@ class TreeNode:
         return np.greater_equal(current_probabilities, random_coin)
 
 
-class TreeClassifier:
+class TreeClassifier(BaseEstimator, ClassifierMixin):
 
-    def __init__(self, epsilon, number_of_iterations, normalizer_mode=None, feature_drop_probability=0.0):
+    def __init__(self, epsilon=0.001, number_of_iterations=5, normalizer_mode=None, feature_drop_probability=0.0):
         # hyper parameters
         self.epsilon = epsilon
         self.number_of_iterations = number_of_iterations
@@ -134,8 +136,11 @@ class TreeClassifier:
     def predict_stochastic(self, data, depth=-1):
         return self.root.predict_stochastic(data, depth)
 
-    def score(self, data):
+    def predict(self, data, y=None):
         return self.predict_deterministic(data)
+
+    def score(self, data, y=None):
+        return accuracy_score(y, self.predict(data))
 
     def print_tree(self, node=None, level=0):
         if node is None:

@@ -1,7 +1,7 @@
 from TreeClassifier import *
 from sklearn.datasets import load_breast_cancer
-from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_score
 
 
 def get_breast_cancer_data():
@@ -9,13 +9,16 @@ def get_breast_cancer_data():
     return data['data'], data['target']
 
 X, y = get_breast_cancer_data()
-treeClassifier = TreeClassifier(0.001, 15, normalizer_mode="norm", feature_drop_probability=0.0)
-treeClassifier.fit(X, y)
-print treeClassifier.print_tree()
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 
-y_hat = treeClassifier.predict_deterministic(X)
-print accuracy_score(y, y_hat)
 
-y_hat = treeClassifier.predict_stochastic(X)
-print accuracy_score(y, y_hat)
+tree_classifier = TreeClassifier(0.001, 5, normalizer_mode="norm", feature_drop_probability=0.0)
+tree_classifier.fit(X_train, y_train)
+print tree_classifier.print_tree()
+
+acc = tree_classifier.score(X_test, y_test)
+print acc
+
+scores = cross_val_score(tree_classifier, X, y, cv=5)
+print scores
 
