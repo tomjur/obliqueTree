@@ -109,7 +109,7 @@ class BaseClassifier:
             self.b = np.reshape(self.b, (-1))
 
     def set_dependency_coefficient(self):
-        lambda_ = np.true_divide(self.a, self.b)
+        lambda_ = np.true_divide(self.b, self.a)
         first = lambda_.flatten()[0]
         if np.all(np.equal(lambda_, first)):
             self.lambda_ = first
@@ -165,50 +165,55 @@ class BaseClassifier:
         return np.add(t1, res)
 
     def approximate_dependent(self):
-        must_occur = [0.5, self.m, 1.0 - self.m]
+        a_norm = np.linalg.norm(self.a)
+        self.w = np.divide(self.a, a_norm)
+        self.g = 4*(self.m - (self.m + self.lambda_ * a_norm)**2 /(0.5+0.5*a_norm) -
+                    (self.m - self.lambda_ * a_norm)**2 /(0.5-0.5*a_norm))
 
-        def get_intersection_points():
-            alphas = np.arange(0.0, 1.0, self.cell_step)
-            alphas = np.append(alphas, [1.0])
-
-            lambda_m = np.multiply(self.lambda_, self.m)
-            p1 = [(lambda_m-1.0) /
-                  (2.0*(alpha*lambda_m - 1.0)) for alpha in alphas]
-            p1 = [p for p in p1 if np.less_equal(0.0, p) and np.less_equal(p, 1.0-self.m)]
-
-            p2and3 = [(2.0*alpha*lambda_m+4.0*self.lambda_-lambda_m-1.0) /
-                      (2.0*(alpha*lambda_m+self.lambda_-alpha*self.lambda_-1.0)) for alpha in alphas]
-            p2and3 = [p for p in p2and3 if np.less_equal(1.0-self.m, p) and np.less_equal(p, 1.0)]
-
-            p4and5 = [(lambda_m-1.0) /
-                      (2.0*(alpha*self.lambda_+lambda_m-alpha*lambda_m-1.0)) for alpha in alphas]
-            p4and5 = [p for p in p4and5 if np.less_equal(0.0, p) and np.less_equal(p, self.m)]
-
-            p6 = [(lambda_m-1.0-2.0*alpha*lambda_m) /
-                  (2.0*(lambda_m-alpha*lambda_m-1.0)) for alpha in alphas]
-            p6 = [p for p in p6 if np.less_equal(self.m, p) and np.less_equal(p, 1.0)]
-
-            return np.append(np.append(p1, p2and3), np.append(p4and5, p6))
-
-        p_candidates = self.generate_p_candidates(0.0, 1.0, must_occur)
-        p_candidates = np.unique(np.append(p_candidates, get_intersection_points()))
-
-        b_norm = np.linalg.norm(self.b)
-        const_term = 0.5*(self.m - 1.0 / self.lambda_)
-        pair_candidates = [(p, p/self.lambda_ + const_term) for p in p_candidates]
-        pair_candidates = [(p, q) for p, q in pair_candidates if
-                           np.less_equal(np.max([0.0, self.m+p-1.0]), q) and np.greater_equal(np.min([self.m, p]), q)]
-        pair_candidates = [(self.get_weighted_ginni(p, q), p, q) for p, q in pair_candidates]
-
-        pair_candidates.sort()
-
-        for g, p, q in pair_candidates:
-            beta = 2.0*q-self.m
-            if np.less_equal(np.square(beta), 1.0):
-                self.w = np.multiply(beta/np.square(b_norm), self.b)
-                self.g = g
-                return
-        raise Exception('Invalid situation')
+        # must_occur = [0.5, self.m, 1.0 - self.m]
+        #
+        # def get_intersection_points():
+        #     alphas = np.arange(0.0, 1.0, self.cell_step)
+        #     alphas = np.append(alphas, [1.0])
+        #
+        #     lambda_m = np.multiply(self.lambda_, self.m)
+        #     p1 = [(lambda_m-1.0) /
+        #           (2.0*(alpha*lambda_m - 1.0)) for alpha in alphas]
+        #     p1 = [p for p in p1 if np.less_equal(0.0, p) and np.less_equal(p, 1.0-self.m)]
+        #
+        #     p2and3 = [(2.0*alpha*lambda_m+4.0*self.lambda_-lambda_m-1.0) /
+        #               (2.0*(alpha*lambda_m+self.lambda_-alpha*self.lambda_-1.0)) for alpha in alphas]
+        #     p2and3 = [p for p in p2and3 if np.less_equal(1.0-self.m, p) and np.less_equal(p, 1.0)]
+        #
+        #     p4and5 = [(lambda_m-1.0) /
+        #               (2.0*(alpha*self.lambda_+lambda_m-alpha*lambda_m-1.0)) for alpha in alphas]
+        #     p4and5 = [p for p in p4and5 if np.less_equal(0.0, p) and np.less_equal(p, self.m)]
+        #
+        #     p6 = [(lambda_m-1.0-2.0*alpha*lambda_m) /
+        #           (2.0*(lambda_m-alpha*lambda_m-1.0)) for alpha in alphas]
+        #     p6 = [p for p in p6 if np.less_equal(self.m, p) and np.less_equal(p, 1.0)]
+        #
+        #     return np.append(np.append(p1, p2and3), np.append(p4and5, p6))
+        #
+        # p_candidates = self.generate_p_candidates(0.0, 1.0, must_occur)
+        # p_candidates = np.unique(np.append(p_candidates, get_intersection_points()))
+        #
+        # b_norm = np.linalg.norm(self.b)
+        # const_term = 0.5*(self.m - 1.0 / self.lambda_)
+        # pair_candidates = [(p, p/self.lambda_ + const_term) for p in p_candidates]
+        # pair_candidates = [(p, q) for p, q in pair_candidates if
+        #                    np.less_equal(np.max([0.0, self.m+p-1.0]), q) and np.greater_equal(np.min([self.m, p]), q)]
+        # pair_candidates = [(self.get_weighted_ginni(p, q), p, q) for p, q in pair_candidates]
+        #
+        # pair_candidates.sort()
+        #
+        # for g, p, q in pair_candidates:
+        #     beta = 2.0*q-self.m
+        #     if np.less_equal(np.square(beta), 1.0):
+        #         self.w = np.multiply(beta/np.square(b_norm), self.b)
+        #         self.g = g
+        #         return
+        # raise Exception('Invalid situation')
 
     def approximate_2_ranges(self):
         must_occur = [0.5, self.m, 1.0-self.m]

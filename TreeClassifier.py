@@ -106,6 +106,10 @@ class TreeClassifier(BaseEstimator, ClassifierMixin):
         self.root = None
 
     def fit(self, data, labels):
+        # return self.fit1(data,labels)
+        return self.fit2(data,labels)
+
+    def fit1(self, data, labels):
         # initial data distribution
         data_dist = np.ones(labels.shape) / data.shape[0]
         root = TreeNode(data, data_dist, labels, self.epsilon, self.normalizer_mode, self.feature_drop_probability)
@@ -129,6 +133,24 @@ class TreeClassifier(BaseEstimator, ClassifierMixin):
             # add the newly discovered leaves as potential splits
             leaves.extend([l, r])
         self.root = root
+
+    def fit2(self, data, labels):
+        data_dist = np.ones(labels.shape) / data.shape[0]
+        root = TreeNode(data, data_dist, labels, self.epsilon, self.normalizer_mode, self.feature_drop_probability)
+        self.recursive_fit(self.number_of_iterations, root)
+        self.root = root
+
+    def recursive_fit(self, levels, tree_node):
+        if tree_node.weight < (1.0 / tree_node.data.shape[0]) or levels < 2:
+            print "stopping level {}".format(levels)
+            return
+        print "splitting leaf with weight {} and purity {}".format(tree_node.weight, tree_node.m)
+        tree_node.get_gain()
+        l, r = tree_node.set_as_internal()
+        print "l_child weight {} and purity {}".format(l.weight, l.m)
+        print "r_child weight {} and purity {}".format(r.weight, r.m)
+        self.recursive_fit(levels-1, l)
+        self.recursive_fit(levels-1, r)
 
     def predict_deterministic(self, data, depth=-1):
         return self.root.predict_deterministic(data, depth)
@@ -159,19 +181,43 @@ if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
 
-    def create_data_simulation():
+    def create_sized_data():
+        X = np.random.uniform(-2, 2, [300, 2])
+        sizes = np.reshape(np.sqrt(np.square(X).sum(axis=1)), (-1, 1)).reshape([-1])
+        keep = np.logical_or(np.less_equal(sizes, 0.75), np.greater_equal(sizes, 1.25))
+        # X = np.delete(X, to_remove,axis=0)
+        X = X[keep]
+        sizes = np.reshape(np.sqrt(np.square(X).sum(axis=1)), (-1, 1)).reshape([-1])
+        y = np.greater_equal(sizes, 1.0)
+        return X, y
+
+
+    def create_data_simulation_middle():
         X1 = np.random.multivariate_normal([1.0,1.0], [[0.05,0.0],[0.0,0.05]], size = 50)
         y1 = np.ones([50,])
         X2 = np.random.multivariate_normal([-1.0,-1.0], [[0.05,0.0],[0.0,0.05]], size = 50)
         y2 = np.ones([50,])
-        # X3 = np.random.multivariate_normal([0.0,0.0], [[0.05,0.0],[0.0,0.05]], size = 50)
-        X3 = np.random.multivariate_normal([-3.0,3.0], [[0.05,0.0],[0.0,0.05]], size = 50)
+        X3 = np.random.multivariate_normal([0.0,0.0], [[0.05,0.0],[0.0,0.05]], size = 50)
+        # X3 = np.random.multivariate_normal([-3.0,3.0], [[0.05,0.0],[0.0,0.05]], size = 50)
         y3 = np.zeros([50,])
         return np.concatenate([X1,X2,X3], axis =0), np.concatenate([y1,y2,y3], axis =0)
 
+    def create_data_simulation_xor():
+        X1 = np.random.multivariate_normal([1.0,1.0], [[0.05,0.0],[0.0,0.05]], size = 50)
+        y1 = np.ones([50,])
+        X2 = np.random.multivariate_normal([-1.0,-1.0], [[0.05,0.0],[0.0,0.05]], size = 50)
+        y2 = np.ones([50,])
+        X3 = np.random.multivariate_normal([-1.0,1.0], [[0.05,0.0],[0.0,0.05]], size = 50)
+        y3 = np.zeros([50,])
+        X4 = np.random.multivariate_normal([1.0,-1.0], [[0.05,0.0],[0.0,0.05]], size = 50)
+        y4 = np.zeros([50,])
+        return np.concatenate([X1,X2,X3,X4], axis =0), np.concatenate([y1,y2,y3,y4], axis =0)
 
-    X, y = create_data_simulation()
-    treeClassifier = TreeClassifier(0.05, 20, normalizer_mode="norm", feature_drop_probability=0.0)
+
+    # X, y = create_data_simulation_middle()
+    # X, y = create_data_simulation_xor()
+    X, y = create_sized_data()
+    treeClassifier = TreeClassifier(0.05, 15, normalizer_mode="norm", feature_drop_probability=0.0)
     # treeClassifier = TreeClassifier(0.05, 10, normalizer_mode="range", feature_drop_probability=0.0)
     treeClassifier.fit(X, y)
 

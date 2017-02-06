@@ -1,16 +1,65 @@
 from TreeClassifier import *
-from sklearn.datasets import fetch_mldata
-from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_val_score
+from sklearn import tree
+import numpy as np
 
-# gets teh mnist data
-mnist = fetch_mldata('MNIST original', data_home=r'c:\temp\mnist')
+datasets = ['mnist', 'iris', 'breast_cancer', 'polish_companies_y1', 'polish_companies_y2',
+            'polish_companies_y3', 'polish_companies_y4', 'polish_companies_y5', 'diabetic_retinopathy_debrecen']
+current_dataset_index = 1
+depth_of_tree = 15
+
+dataset = datasets[current_dataset_index]
+
+
+def load_arff(filepath):
+    from scipy.io.arff import loadarff
+    dataAndLabels = loadarff(filepath)[0]
+    data = np.array([list(row)[:-1] for row in dataAndLabels])
+    target = np.array([int(list(row)[-1]) for row in dataAndLabels])
+    keep_index = ~np.isnan(data).any(axis=1)
+    data = data[keep_index]
+    target = target[keep_index]
+    return data, target
+
+
+def load_polish(year):
+    return load_arff(r"C:\temp\thesis_data\Dane\{}year.arff".format(year))
+
+
+def get_data(dataset):
+    if dataset == datasets[0]:
+        # gets the mnist data
+        from sklearn.datasets import fetch_mldata
+        mnist = fetch_mldata('MNIST original', data_home=r'c:\temp\mnist')
+        data = mnist.data
+        target = mnist.target
+    if dataset == datasets[1]:
+        # gets the iris data
+        from sklearn.datasets import load_iris
+        data, target = load_iris(True)
+    if dataset == datasets[2]:
+        # gets the breast cancer data
+        from sklearn.datasets import load_breast_cancer
+        breast = load_breast_cancer()
+        data = breast['data']
+        target = breast['target']
+    if 2 < current_dataset_index < 8:
+        # polish companies
+        # https://archive.ics.uci.edu/ml/datasets/Polish+companies+bankruptcy+data
+        data, target = load_polish(current_dataset_index-2)
+    if current_dataset_index == 8:
+        # load diabetic dataset
+        # https://archive.ics.uci.edu/ml/datasets/Diabetic+Retinopathy+Debrecen+Data+Set
+        data,target = load_arff(r"C:\temp\thesis_data\messidor_features.arff")
+    return data, target
+
+data, target = get_data(dataset)
 
 
 def create_data_matrix(label0, label1):
 
     def get_data_for_label(label):
-        return mnist.data[mnist.target == label]
+        return data[target == label]
 
     d1 = get_data_for_label(label0)
     d2 = get_data_for_label(label1)
@@ -27,17 +76,30 @@ def create_data_matrix(label0, label1):
 
 def accuracy_for_pair(label0, label1, epsilon=0.001, depth=5):
     X, y = create_data_matrix(label0, label1)
-    tree_classifier = TreeClassifier(epsilon, depth, normalizer_mode="norm", feature_drop_probability=0.0)
-    scores = cross_val_score(tree_classifier, X, y, cv=5)
-    return scores
+    if is_tree:
+        tree_classifier = tree.DecisionTreeClassifier(max_depth=depth)
+    else:
+        tree_classifier = TreeClassifier(epsilon, depth, normalizer_mode="norm", feature_drop_probability=0.0)
+    return cross_val_score(tree_classifier, X, y, cv=5)
 
-print accuracy_for_pair(3, 5)
+# print accuracy_for_pair(3, 5, depth=45)
 
-# f = open(r"C:\temp\mnist_results.txt", "w")
-# for i in range(10):
-#     for j in range(i+1, 10):
-#         scores = accuracy_for_pair(i, j)
-#         f.write(str((i, j)))
-#         f.write(str(scores))
-# f.close()
+for is_tree in [True, False]:
+    f = open(r"C:\temp\{}_{}_{}.txt".format(dataset, depth_of_tree, is_tree), "w")
+    number_of_classes = np.max(target).astype(int) + 1
+    print 'number of classes {}'.format(number_of_classes)
+    means = []
+    for i in range(number_of_classes):
+        for j in range(i+1, number_of_classes):
+            print (i,j)
+            scores = accuracy_for_pair(i, j, depth=5)
+            f.write(str((i, j)))
+            f.write(' ')
+            f.write(str(scores))
+            f.write(' ')
+            f.write(str(np.mean(scores)))
+            f.write('\n')
+            means += [np.mean(scores)]
+    f.write(str(np.mean(means)))
+    f.close()
 
