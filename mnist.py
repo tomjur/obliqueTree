@@ -3,10 +3,11 @@ from sklearn.model_selection import cross_val_score
 from sklearn import tree
 import numpy as np
 
-datasets = ['mnist', 'iris', 'breast_cancer', 'polish_companies_y1', 'polish_companies_y2',
-            'polish_companies_y3', 'polish_companies_y4', 'polish_companies_y5', 'diabetic_retinopathy_debrecen']
-current_dataset_index = 1
-depth_of_tree = 15
+datasets = ['mnist', 'iris', 'breast_cancer', 'polish_companies_y1', 'polish_companies_y2', #5
+            'polish_companies_y3', 'polish_companies_y4', 'polish_companies_y5', 'diabetic_retinopathy_debrecen', #9
+            'adult']
+current_dataset_index = 9
+depth_of_tree = 5
 
 dataset = datasets[current_dataset_index]
 
@@ -24,6 +25,27 @@ def load_arff(filepath):
 
 def load_polish(year):
     return load_arff(r"C:\temp\thesis_data\Dane\{}year.arff".format(year))
+
+
+def load_adult():
+    import pandas as pd
+    from sklearn.feature_extraction import DictVectorizer
+    def encode_onehot(df, cols):
+        vec = DictVectorizer()
+
+        vec_data = pd.DataFrame(vec.fit_transform(df[cols].to_dict(outtype='records')).toarray())
+        vec_data.columns = vec.get_feature_names()
+        vec_data.index = df.index
+
+        df = df.drop(cols, axis=1)
+        df = df.join(vec_data)
+        return df
+    data = pd.read_csv(r"C:\temp\thesis_data\adult\adult.data",header=None)
+    data = data.dropna()
+    data = encode_onehot(data,[1,3,5,6,7,8,9,13,14])
+    data = data.values.astype(float)
+    
+    return data[:,:-1], data[:,-1].astype(int)
 
 
 def get_data(dataset):
@@ -51,6 +73,9 @@ def get_data(dataset):
         # load diabetic dataset
         # https://archive.ics.uci.edu/ml/datasets/Diabetic+Retinopathy+Debrecen+Data+Set
         data,target = load_arff(r"C:\temp\thesis_data\messidor_features.arff")
+    if current_dataset_index == 9:
+        # http://archive.ics.uci.edu/ml/datasets/Adult
+        data,target = load_adult()
     return data, target
 
 data, target = get_data(dataset)

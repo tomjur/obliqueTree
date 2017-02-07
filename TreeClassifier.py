@@ -215,8 +215,8 @@ if __name__ == "__main__":
 
 
     # X, y = create_data_simulation_middle()
-    # X, y = create_data_simulation_xor()
-    X, y = create_sized_data()
+    X, y = create_data_simulation_xor()
+    # X, y = create_sized_data()
     treeClassifier = TreeClassifier(0.05, 15, normalizer_mode="norm", feature_drop_probability=0.0)
     # treeClassifier = TreeClassifier(0.05, 10, normalizer_mode="range", feature_drop_probability=0.0)
     treeClassifier.fit(X, y)
