@@ -244,9 +244,10 @@ class BaseClassifier:
 
     def approximate_1_range(self):
         a_norm = np.linalg.norm(self.a)
+        a_norm_sqr = np.square(a_norm)
 
         a_dot_b = np.dot(self.a, self.b)
-        b_hat = np.subtract(self.b, np.multiply(a_dot_b / a_norm**2, self.a))
+        b_hat = np.subtract(self.b, np.multiply(a_dot_b / a_norm_sqr, self.a))
         b_hat_norm = np.linalg.norm(b_hat)
         w_term1 = np.divide(self.a, np.square(a_norm))
         w_term2 = np.divide(b_hat, np.multiply(a_norm, b_hat_norm))
@@ -265,10 +266,12 @@ class BaseClassifier:
 
         for p in p_candidates:
             c = 2.0*p - 1.0
-            root = np.sqrt(np.max([0, a_norm**2 - c**2]))
-            w1 = np.add(np.multiply(c, w_term1), np.multiply(root, w_term2))
+            root = np.sqrt(np.max([0, a_norm_sqr - np.square(c)]))
+            current_w_term1 = np.multiply(c, w_term1)
+            current_w_term2 = np.multiply(root, w_term2)
+            w1 = np.add(current_w_term1, current_w_term2)
             pair_candidates += [extend_with_q_and_ginni(p, w1)]
-            w2 = np.subtract(np.multiply(c, w_term1), np.multiply(root, w_term2))
+            w2 = np.subtract(current_w_term1, current_w_term2)
             pair_candidates += [extend_with_q_and_ginni(p, w2)]
 
         best_index = np.argmin([x[0] for x in pair_candidates])
