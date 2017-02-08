@@ -269,10 +269,14 @@ class BaseClassifier:
             root = np.sqrt(np.max([0, a_norm_sqr - np.square(c)]))
             current_w_term1 = np.multiply(c, w_term1)
             current_w_term2 = np.multiply(root, w_term2)
-            w1 = np.add(current_w_term1, current_w_term2)
-            pair_candidates += [extend_with_q_and_ginni(p, w1)]
-            w2 = np.subtract(current_w_term1, current_w_term2)
-            pair_candidates += [extend_with_q_and_ginni(p, w2)]
+            pair_candidates += [(p,np.add(current_w_term1, current_w_term2))]
+            pair_candidates += [(p,np.subtract(current_w_term1, current_w_term2))]
+            # w1 = np.add(current_w_term1, current_w_term2)
+            # pair_candidates += [extend_with_q_and_ginni(p, w1)]
+            # w2 = np.subtract(current_w_term1, current_w_term2)
+            # pair_candidates += [extend_with_q_and_ginni(p, w2)]
+
+        pair_candidates = [extend_with_q_and_ginni(p, w) for p,w in pair_candidates]
 
         best_index = np.argmin([x[0] for x in pair_candidates])
         best = pair_candidates[best_index]
