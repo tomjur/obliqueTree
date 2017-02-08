@@ -273,7 +273,7 @@ def run_main():
     plt.scatter(X[:, 0], X[:, 1], marker='o', c=y_hat2)
     plt.xlim(xx.min(), xx.max())
     plt.ylim(yy.min(), yy.max())
-    # plt.show()
+    plt.show()
     print 'done'
 
 if __name__ == "__main__":
