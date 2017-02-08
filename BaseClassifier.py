@@ -75,11 +75,6 @@ class BaseClassifier:
         self.cell_step = epsilon / inter_cell_bound
         self.algorithm_mode = algorithm_mode  # if None, to be inferred when the data is available
 
-        # data related
-        self.data = None
-        self.data_dist = None
-        self.labels = None
-
         # internal values for classifiers
         self.a = None
         self.b = None
@@ -90,13 +85,13 @@ class BaseClassifier:
         self.w = None
         self.g = None
 
-    def set_globals(self):
-        weighted_label = np.multiply(self.data_dist, self.labels)
+    def set_globals(self, data, labels, data_dist):
+        weighted_label = np.multiply(data_dist, labels)
         self.m = weighted_label.sum()
-        self.a = np.squeeze(np.dot(self.data_dist.transpose(), self.data))
+        self.a = np.squeeze(np.dot(data_dist.transpose(), data))
         if len(self.a.shape) == 0:
             self.a = np.reshape(self.a, (-1))
-        self.b = np.squeeze(np.dot(weighted_label.transpose(), self.data))
+        self.b = np.squeeze(np.dot(weighted_label.transpose(), data))
         if len(self.b.shape) == 0:
             self.b = np.reshape(self.b, (-1))
 
@@ -282,10 +277,7 @@ class BaseClassifier:
         self.g = best[0]
 
     def approximate_solver(self, data, labels, data_dist):
-        self.data = data
-        self.labels = labels
-        self.data_dist = data_dist
-        self.set_globals()
+        self.set_globals(data, labels, data_dist)
         self.set_dependency_coefficient()
         if np.equal(0.0, self.lambda_):
             if self.algorithm_mode is None:
