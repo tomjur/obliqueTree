@@ -180,12 +180,8 @@ class TreeClassifier(BaseEstimator, ClassifierMixin):
             res += self.print_tree(node.right, level+1)
         return res
 
-if __name__ == "__main__":
-    # from sklearn.datasets import make_blobs
-    # create fake data
-    # X, y = make_blobs(n_features=2, centers=3)
-    # y[y>0]=1
 
+def run_main():
     import matplotlib.pyplot as plt
 
     def create_sized_data():
@@ -277,5 +273,9 @@ if __name__ == "__main__":
     plt.scatter(X[:, 0], X[:, 1], marker='o', c=y_hat2)
     plt.xlim(xx.min(), xx.max())
     plt.ylim(yy.min(), yy.max())
-    plt.show()
+    # plt.show()
     print 'done'
+
+if __name__ == "__main__":
+    import cProfile
+    cProfile.run('run_main()', sort=1)

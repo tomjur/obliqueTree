@@ -257,13 +257,8 @@ class BaseClassifier:
         upper_p = np.min([0.5*(1+a_norm), 1.0])
 
         p_candidates = self.generate_p_candidates(lower_p, upper_p, must_occur)
+
         pair_candidates = []
-
-        def extend_with_q_and_ginni(p, w):
-            q = np.divide(np.add(np.dot(self.b, w), self.m), 2.0)
-            g = self.get_weighted_ginni(p, q)
-            return g, p, q, w.ravel()
-
         for p in p_candidates:
             c = 2.0*p - 1.0
             root = np.sqrt(np.max([0, a_norm_sqr - np.square(c)]))
@@ -271,12 +266,12 @@ class BaseClassifier:
             current_w_term2 = np.multiply(root, w_term2)
             pair_candidates += [(p,np.add(current_w_term1, current_w_term2))]
             pair_candidates += [(p,np.subtract(current_w_term1, current_w_term2))]
-            # w1 = np.add(current_w_term1, current_w_term2)
-            # pair_candidates += [extend_with_q_and_ginni(p, w1)]
-            # w2 = np.subtract(current_w_term1, current_w_term2)
-            # pair_candidates += [extend_with_q_and_ginni(p, w2)]
 
-        pair_candidates = [extend_with_q_and_ginni(p, w) for p,w in pair_candidates]
+        def extend_with_q_and_ginni(p, w):
+            q = np.divide(np.add(np.dot(self.b, w), self.m), 2.0)
+            g = self.get_weighted_ginni(p, q)
+            return g, p, q, w.ravel()
+        pair_candidates = [extend_with_q_and_ginni(p, w) for p, w in pair_candidates]
 
         best_index = np.argmin([x[0] for x in pair_candidates])
         best = pair_candidates[best_index]
@@ -422,6 +417,9 @@ if __name__ == "__main__":
         plt.ylim(yy.min(), yy.max())
 
         plt.show()
+    import cProfile
 
-    validate_approximation()
+    print cProfile.run('validate_approximation()')
+
+    # validate_approximation()
     print 'done'
