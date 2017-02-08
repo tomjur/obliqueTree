@@ -6,14 +6,12 @@ import numpy as np
 
 class TreeNode:
 
-    def __init__(self, data, data_dist, labels, epsilon, normalizer_mode, feature_drop_probability):
+    def __init__(self, data, data_dist, labels, epsilon):
         # data
         self.data = data
         self.data_dist = data_dist
         self.labels = labels
         self.epsilon = epsilon
-        self.normalizer_mode = normalizer_mode
-        self.feature_drop_probability = feature_drop_probability
 
         # internal data structures
         self.left = None
@@ -33,10 +31,7 @@ class TreeNode:
         normalized_data_dist = np.divide(self.data_dist, self.weight)
         normalized_epsilon = self.epsilon / self.weight
         normalized_epsilon = np.min([0.5, normalized_epsilon, 10*self.epsilon])
-        # self.classifier = BaseClassifier(self.epsilon, normalizer_mode=self.normalizer_mode,
-        #                                  feature_drop_probability=self.feature_drop_probability)
-        self.classifier = BaseClassifier(normalized_epsilon, normalizer_mode=self.normalizer_mode,
-                                         feature_drop_probability=self.feature_drop_probability)
+        self.classifier = BaseClassifier(normalized_epsilon)
         self.classifier.approximate_solver(self.data, self.labels, normalized_data_dist)
         self.gain = self.weight*(self.classifier.get_ginni(self.m) - self.classifier.g)
 
@@ -44,10 +39,8 @@ class TreeNode:
         pl1 = self.classifier.get_probabilities(self.data)
         pl0 = np.subtract(1.0, pl1)
         self.is_leaf = False
-        self.left = TreeNode(self.data, np.multiply(self.data_dist, pl1), self.labels, self.epsilon,
-                             self.normalizer_mode, self.feature_drop_probability)
-        self.right = TreeNode(self.data, np.multiply(self.data_dist, pl0), self.labels, self.epsilon,
-                              self.normalizer_mode, self.feature_drop_probability)
+        self.left = TreeNode(self.data, np.multiply(self.data_dist, pl1), self.labels, self.epsilon)
+        self.right = TreeNode(self.data, np.multiply(self.data_dist, pl0), self.labels, self.epsilon)
         return self.left, self.right
 
     def get_gain(self):
@@ -95,39 +88,49 @@ class TreeNode:
 
 class TreeClassifier(BaseEstimator, ClassifierMixin):
 
-    def __init__(self, epsilon=0.001, number_of_iterations=5, normalizer_mode=None, feature_drop_probability=0.0):
+    def __init__(self, epsilon=0.001, number_of_iterations=5, normalizer_mode=None, print_debug=True):
         # hyper parameters
         self.epsilon = epsilon
         self.number_of_iterations = number_of_iterations
-        self.normalizer_mode = normalizer_mode
-        self.feature_drop_probability = feature_drop_probability
+        if normalizer_mode is None or normalizer_mode == "range":
+            self.normalizer = RangeNormalizer()
+        else:
+            self.normalizer = NormOneNormalizer()
+        self.print_debug = print_debug
 
         # model
         self.root = None
 
     def fit(self, data, labels):
-        # return self.fit1(data,labels)
-        return self.fit2(data,labels)
+        norm_data = self.normalizer.normalize_train(data)
+        # return self.fit1(norm_data, labels)
+        return self.fit2(norm_data, labels)
 
     def fit1(self, data, labels):
         # initial data distribution
         data_dist = np.ones(labels.shape) / data.shape[0]
-        root = TreeNode(data, data_dist, labels, self.epsilon, self.normalizer_mode, self.feature_drop_probability)
+        root = TreeNode(data, data_dist, labels, self.epsilon)
         leaves = [root]
         for t in range(0, self.number_of_iterations):
-            print "iteration {} from {}".format(t, self.number_of_iterations)
+            if self.print_debug:
+                print "iteration {} from {}".format(t, self.number_of_iterations)
             # get maximal gain (weighted)
             gains = [l.get_gain() for l in leaves]
             if np.less_equal(np.max(gains), 0.0):
-                print 'negative gain aborting, gains:'
-                print gains
+                if self.print_debug:
+                    print 'negative gain aborting, gains:'
+                if self.print_debug:
+                    print gains
                 break
             leaf_index = np.argmax(gains)
-            print "splitting leaf with weight {} and purity {}".format(leaves[leaf_index].weight, leaves[leaf_index].m)
+            if self.print_debug:
+                print "splitting leaf with weight {} and purity {}".format(leaves[leaf_index].weight, leaves[leaf_index].m)
             # set that leaf as internal and get the split
             l, r = leaves[leaf_index].set_as_internal()
-            print "l_child weight {} and purity {}".format(l.weight, l.m)
-            print "r_child weight {} and purity {}".format(r.weight, r.m)
+            if self.print_debug:
+                print "l_child weight {} and purity {}".format(l.weight, l.m)
+            if self.print_debug:
+                print "r_child weight {} and purity {}".format(r.weight, r.m)
             # remove now-internal-node from list of leaves
             leaves.pop(leaf_index)
             # add the newly discovered leaves as potential splits
@@ -136,27 +139,31 @@ class TreeClassifier(BaseEstimator, ClassifierMixin):
 
     def fit2(self, data, labels):
         data_dist = np.ones(labels.shape) / data.shape[0]
-        root = TreeNode(data, data_dist, labels, self.epsilon, self.normalizer_mode, self.feature_drop_probability)
+        root = TreeNode(data, data_dist, labels, self.epsilon)
         self.recursive_fit(self.number_of_iterations, root)
         self.root = root
 
     def recursive_fit(self, levels, tree_node):
         if tree_node.weight < (1.0 / tree_node.data.shape[0]) or levels < 2:
-            print "stopping level {}".format(levels)
+            if self.print_debug:
+                print "stopping level {}".format(levels)
             return
-        print "splitting leaf with weight {} and purity {}".format(tree_node.weight, tree_node.m)
+        if self.print_debug:
+            print "splitting leaf with weight {} and purity {}".format(tree_node.weight, tree_node.m)
         tree_node.get_gain()
         l, r = tree_node.set_as_internal()
-        print "l_child weight {} and purity {}".format(l.weight, l.m)
-        print "r_child weight {} and purity {}".format(r.weight, r.m)
+        if self.print_debug:
+            print "l_child weight {} and purity {}".format(l.weight, l.m)
+        if self.print_debug:
+            print "r_child weight {} and purity {}".format(r.weight, r.m)
         self.recursive_fit(levels-1, l)
         self.recursive_fit(levels-1, r)
 
     def predict_deterministic(self, data, depth=-1):
-        return self.root.predict_deterministic(data, depth)
+        return self.root.predict_deterministic(self.normalizer.normalize_test(data), depth)
 
     def predict_stochastic(self, data, depth=-1):
-        return self.root.predict_stochastic(data, depth)
+        return self.root.predict_stochastic(self.normalizer.normalize_test(data), depth)
 
     def predict(self, data, y=None):
         return self.predict_deterministic(data)
@@ -217,7 +224,7 @@ if __name__ == "__main__":
     # X, y = create_data_simulation_middle()
     X, y = create_data_simulation_xor()
     # X, y = create_sized_data()
-    treeClassifier = TreeClassifier(0.05, 15, normalizer_mode="norm", feature_drop_probability=0.0)
+    treeClassifier = TreeClassifier(0.05, 15, normalizer_mode="norm", print_debug=False)
     # treeClassifier = TreeClassifier(0.05, 10, normalizer_mode="range", feature_drop_probability=0.0)
     treeClassifier.fit(X, y)
 

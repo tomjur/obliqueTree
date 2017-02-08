@@ -68,27 +68,19 @@ class RangeNormalizer(DataNormalizer):
 
 class BaseClassifier:
 
-    def __init__(self, epsilon, inter_cell_bound=100, normalizer_mode=None, algorithm_mode=None,
-                 feature_drop_probability=0.0):
+    def __init__(self, epsilon, inter_cell_bound=100, algorithm_mode=None):
         # hyper parameters
         self.epsilon = epsilon
         self.interCellBound = inter_cell_bound
         self.cell_step = epsilon / inter_cell_bound
-        if normalizer_mode is None or normalizer_mode == "range":
-            self.normalizer = RangeNormalizer()
-        else:
-            self.normalizer = NormOneNormalizer()
         self.algorithm_mode = algorithm_mode  # if None, to be inferred when the data is available
-        self.feature_drop_probability = feature_drop_probability
 
         # data related
         self.data = None
-        self.features_to_keep = None
         self.data_dist = None
         self.labels = None
 
         # internal values for classifiers
-        self.data_normalized = None
         self.a = None
         self.b = None
         self.m = -1.0
@@ -101,10 +93,10 @@ class BaseClassifier:
     def set_globals(self):
         weighted_label = np.multiply(self.data_dist, self.labels)
         self.m = weighted_label.sum()
-        self.a = np.squeeze(np.dot(self.data_dist.transpose(), self.data_normalized))
+        self.a = np.squeeze(np.dot(self.data_dist.transpose(), self.data))
         if len(self.a.shape) == 0:
             self.a = np.reshape(self.a, (-1))
-        self.b = np.squeeze(np.dot(weighted_label.transpose(), self.data_normalized))
+        self.b = np.squeeze(np.dot(weighted_label.transpose(), self.data))
         if len(self.b.shape) == 0:
             self.b = np.reshape(self.b, (-1))
 
@@ -290,17 +282,9 @@ class BaseClassifier:
         self.g = best[0]
 
     def approximate_solver(self, data, labels, data_dist):
-        self.features_to_keep = np.zeros((0,))
-        while np.equal(self.features_to_keep.sum(), 0.0):
-            self.features_to_keep = np.greater_equal(
-                np.random.uniform(0.0, 1.0, data.shape[1]), self.feature_drop_probability)
-
         self.data = data
         self.labels = labels
         self.data_dist = data_dist
-        # self.data_normalized = self.normalizer.normalize_train(data)
-        self.data_normalized = data[:, self.features_to_keep]
-        self.data_normalized = self.normalizer.normalize_train(self.data_normalized)
         self.set_globals()
         self.set_dependency_coefficient()
         if np.equal(0.0, self.lambda_):
@@ -319,28 +303,27 @@ class BaseClassifier:
             self.approximate_dependent()
         # self.set_w_to_positive_side()
 
-    def set_w_to_positive_side(self):
-        probabilities_positive = self.get_probabilities(self.data)
-        probabilities_negative = np.subtract(1.0, probabilities_positive)
-
-        positive_labels = np.dot(probabilities_positive, self.labels)
-        negative_labels = np.dot(probabilities_negative, self.labels)
-
-        if np.greater_equal(positive_labels, negative_labels):
-            return
-
-        self.w = np.multiply(-1.0, self.w)
-        probabilities_positive = self.get_probabilities(self.data)
-        probabilities_negative = np.subtract(1.0, probabilities_positive)
-
-        positive_labels = np.dot(probabilities_positive, self.labels)
-        negative_labels = np.dot(probabilities_negative, self.labels)
-        if np.less(positive_labels, negative_labels):
-            raise Exception('Invalid situation')
+    # def set_w_to_positive_side(self):
+    #     probabilities_positive = self.get_probabilities(self.data)
+    #     probabilities_negative = np.subtract(1.0, probabilities_positive)
+    #
+    #     positive_labels = np.dot(probabilities_positive, self.labels)
+    #     negative_labels = np.dot(probabilities_negative, self.labels)
+    #
+    #     if np.greater_equal(positive_labels, negative_labels):
+    #         return
+    #
+    #     self.w = np.multiply(-1.0, self.w)
+    #     probabilities_positive = self.get_probabilities(self.data)
+    #     probabilities_negative = np.subtract(1.0, probabilities_positive)
+    #
+    #     positive_labels = np.dot(probabilities_positive, self.labels)
+    #     negative_labels = np.dot(probabilities_negative, self.labels)
+    #     if np.less(positive_labels, negative_labels):
+    #         raise Exception('Invalid situation')
 
     def get_probabilities(self, data):
-        normalized_data = self.normalizer.normalize_test(data[:, self.features_to_keep])
-        res = np.multiply(np.add(np.dot(normalized_data, self.w), 1.0), 0.5)
+        res = np.multiply(np.add(np.dot(data, self.w), 1.0), 0.5)
         # make sure probabilities are in range
         res[np.less(res, 0.0)] = 0.0
         res[np.greater(res, 1.0)] = 1.0

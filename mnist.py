@@ -5,12 +5,30 @@ import numpy as np
 
 datasets = ['mnist', 'iris', 'breast_cancer', 'polish_companies_y1', 'polish_companies_y2', #5
             'polish_companies_y3', 'polish_companies_y4', 'polish_companies_y5', 'diabetic_retinopathy_debrecen', #9
-            'adult']
-current_dataset_index = 9
+            'adult', 'dorothea']
+current_dataset_index = 10
 depth_of_tree = 5
 
 dataset = datasets[current_dataset_index]
 
+def load_dorothea():
+    with open(r"C:\temp\thesis_data\dorothea\dorothea_train.data") as f:
+        content = f.readlines()
+    res = []
+    ps = []
+    for i in range(len(content)):
+        parts = content[i].split()
+        for p in parts:
+            if len(p)>0:
+                ps.append(int(p))
+                res.append((i-1, int(p)-1))
+    data = np.zeros([len(content),max(ps)])
+    for r in res:
+        data[r]=1.0
+    with open(r"C:\temp\thesis_data\dorothea\dorothea_train.labels") as f:
+        content = f.readlines()
+    target = np.array([1 if int(l) == 1 else 0 for l in content])
+    return data,target
 
 def load_arff(filepath):
     from scipy.io.arff import loadarff
@@ -30,6 +48,7 @@ def load_polish(year):
 def load_adult():
     import pandas as pd
     from sklearn.feature_extraction import DictVectorizer
+
     def encode_onehot(df, cols):
         vec = DictVectorizer()
 
@@ -76,6 +95,9 @@ def get_data(dataset):
     if current_dataset_index == 9:
         # http://archive.ics.uci.edu/ml/datasets/Adult
         data,target = load_adult()
+    if current_dataset_index == 10:
+        # http://archive.ics.uci.edu/ml/datasets/Dorothea
+        data,target = load_dorothea()
     return data, target
 
 data, target = get_data(dataset)
