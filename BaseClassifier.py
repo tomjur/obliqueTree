@@ -47,6 +47,34 @@ class NormOneNormalizer(DataNormalizer):
         return self.normalize_data(data)
 
 
+class JustBiasNormalizer(DataNormalizer):
+
+    def __init__(self):
+        super(JustBiasNormalizer, self).__init__()
+        self.data_mean = None
+
+    def normalize_data(self, data):
+        # subtract mean
+        res = np.subtract(data, self.data_mean)
+        # add coordinate to match scale of data
+        # res = np.concatenate((data, np.ones((data.shape[0], 1))), axis=1)
+        # normalize
+        # row_squared_sums = np.reshape(np.sqrt(np.square(res).sum(axis=1)), (-1, 1))
+        # res = np.divide(res, row_squared_sums)
+        # add bias coordinate
+        res = np.concatenate((res, np.ones((data.shape[0], 1))), axis=1)
+        # normalize
+        res = np.divide(res, np.sqrt(2.0))
+        return res
+
+    def normalize_test(self, data):
+        return self.normalize_data(data)
+
+    def normalize_train(self, data):
+        self.data_mean = data.mean(axis=0)
+        return self.normalize_data(data)
+
+
 class RangeNormalizer(DataNormalizer):
 
     def __init__(self):

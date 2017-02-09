@@ -88,14 +88,17 @@ class TreeNode:
 
 class TreeClassifier(BaseEstimator, ClassifierMixin):
 
-    def __init__(self, epsilon=0.001, number_of_iterations=5, normalizer_mode=None, print_debug=True):
+    def __init__(self, epsilon=0.001, number_of_iterations=5, normalizer_mode=None, fit_full_tree=False, print_debug=True):
         # hyper parameters
         self.epsilon = epsilon
         self.number_of_iterations = number_of_iterations
         if normalizer_mode is None or normalizer_mode == "range":
             self.normalizer = RangeNormalizer()
+        if normalizer_mode == "no":
+            self.normalizer = JustBiasNormalizer()
         else:
             self.normalizer = NormOneNormalizer()
+        self.fit_full_tree = fit_full_tree
         self.print_debug = print_debug
 
         # model
@@ -103,8 +106,9 @@ class TreeClassifier(BaseEstimator, ClassifierMixin):
 
     def fit(self, data, labels):
         norm_data = self.normalizer.normalize_train(data)
-        # return self.fit1(norm_data, labels)
-        return self.fit2(norm_data, labels)
+        if self.fit_full_tree:
+            return self.fit2(norm_data, labels)
+        return self.fit1(norm_data, labels)
 
     def fit1(self, data, labels):
         # initial data distribution
