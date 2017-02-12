@@ -92,19 +92,33 @@ class TreeClassifier(BaseEstimator, ClassifierMixin):
         # hyper parameters
         self.epsilon = epsilon
         self.number_of_iterations = number_of_iterations
-        if normalizer_mode is None or normalizer_mode == "range":
-            self.normalizer = RangeNormalizer()
-        if normalizer_mode == "no":
-            self.normalizer = JustBiasNormalizer()
-        else:
-            self.normalizer = NormOneNormalizer()
+        self.normalizer_mode = normalizer_mode
+        self.normalizer = None
+
         self.fit_full_tree = fit_full_tree
         self.print_debug = print_debug
 
         # model
         self.root = None
 
+    def set_normalizer(self):
+        if self.normalizer is not None:
+            return
+        if self.normalizer_mode == "range":
+            print 'range'
+            self.normalizer = RangeNormalizer()
+        elif self.normalizer_mode == "no":
+            print 'just bias'
+            self.normalizer = JustBiasNormalizer()
+        elif self.normalizer_mode == "dropSize":
+            print 'drop size feature'
+            self.normalizer = DropSizeNormalizer()
+        else:
+            print 'full normalization'
+            self.normalizer = NormOneNormalizer()
+
     def fit(self, data, labels):
+        self.set_normalizer()
         norm_data = self.normalizer.normalize_train(data)
         if self.fit_full_tree:
             return self.fit2(norm_data, labels)
@@ -225,7 +239,6 @@ def run_main():
     X, y = create_data_simulation_xor()
     # X, y = create_sized_data()
     treeClassifier = TreeClassifier(0.05, 15, normalizer_mode="norm", print_debug=False)
-    # treeClassifier = TreeClassifier(0.05, 10, normalizer_mode="range", feature_drop_probability=0.0)
     treeClassifier.fit(X, y)
 
     x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
@@ -256,27 +269,24 @@ def run_main():
         return get_ys_for_tree_node(treeClassifier.root, depth)
 
     plt.figure()
-    plt.subplot(131)
-    plt.title("True", fontsize='small')
-    plt.scatter(X[:, 0], X[:, 1], marker='o', c=y)
-    plt.xlim(xx.min(), xx.max())
-    plt.ylim(yy.min(), yy.max())
-    plt.subplot(132)
+    # plt.subplot(131)
+    # plt.title("True", fontsize='small')
+    # plt.scatter(X[:, 0], X[:, 1], marker='o', c=y)
+    # plt.xlim(xx.min(), xx.max())
+    # plt.ylim(yy.min(), yy.max())
+    # plt.subplot(132)
+    plt.subplot(111)
     plt.contourf(xx, yy, z1, cmap=plt.cm.coolwarm, alpha=0.8)
     plt.title("Predicted", fontsize='small')
     plt.scatter(X[:, 0], X[:, 1], marker='o', c=y_hat1)
     plt.xlim(xx.min(), xx.max())
     plt.ylim(yy.min(), yy.max())
-    # x_line = np.unique(xx)
-    # y_lists = all_boundaries(x_line, depth=-1)
-    # for desc in y_lists:
-    #     plt.plot(x_line, desc, '-')
-    plt.subplot(133)
-    plt.contourf(xx, yy, z2, cmap=plt.cm.coolwarm, alpha=0.8)
-    plt.title("Predicted just root", fontsize='small')
-    plt.scatter(X[:, 0], X[:, 1], marker='o', c=y_hat2)
-    plt.xlim(xx.min(), xx.max())
-    plt.ylim(yy.min(), yy.max())
+    # plt.subplot(133)
+    # plt.contourf(xx, yy, z2, cmap=plt.cm.coolwarm, alpha=0.8)
+    # plt.title("Predicted just root", fontsize='small')
+    # plt.scatter(X[:, 0], X[:, 1], marker='o', c=y_hat2)
+    # plt.xlim(xx.min(), xx.max())
+    # plt.ylim(yy.min(), yy.max())
     plt.show()
     print 'done'
 

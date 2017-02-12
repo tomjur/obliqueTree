@@ -5,11 +5,23 @@ import numpy as np
 
 datasets = ['mnist', 'iris', 'breast_cancer', 'polish_companies_y1', 'polish_companies_y2', #5
             'polish_companies_y3', 'polish_companies_y4', 'polish_companies_y5', 'diabetic_retinopathy_debrecen', #9
-            'adult', 'dorothea']
-current_dataset_index = 10
-depth_of_tree = 5
+            'adult', 'dorothea', 'cover']
+current_dataset_index = 11
+depths_of_tree = [1, 3, 5, 10]
+# depth_of_tree = 1
 
 dataset = datasets[current_dataset_index]
+
+def load_arff(filepath):
+    from scipy.io.arff import loadarff
+    dataAndLabels = loadarff(filepath)[0]
+    data = np.array([list(row)[:-1] for row in dataAndLabels])
+    target = np.array([int(list(row)[-1]) for row in dataAndLabels])
+    keep_index = ~np.isnan(data).any(axis=1)
+    data = data[keep_index]
+    target = target[keep_index]
+    return data, target
+
 
 def load_dorothea():
     with open(r"C:\temp\thesis_data\dorothea\dorothea_train.data") as f:
@@ -30,15 +42,11 @@ def load_dorothea():
     target = np.array([1 if int(l) == 1 else 0 for l in content])
     return data,target
 
-def load_arff(filepath):
-    from scipy.io.arff import loadarff
-    dataAndLabels = loadarff(filepath)[0]
-    data = np.array([list(row)[:-1] for row in dataAndLabels])
-    target = np.array([int(list(row)[-1]) for row in dataAndLabels])
-    keep_index = ~np.isnan(data).any(axis=1)
-    data = data[keep_index]
-    target = target[keep_index]
-    return data, target
+
+def load_cover():
+    import pandas as pd
+    df = pd.read_csv(r"C:\Temp\thesis_data\cover-type\covtype.data", header=None)
+    return df.values[:, :-1].astype(float), df.values[:, -1]-1
 
 
 def load_polish(year):
@@ -74,30 +82,33 @@ def get_data(dataset):
         mnist = fetch_mldata('MNIST original', data_home=r'c:\temp\mnist')
         data = mnist.data
         target = mnist.target
-    if dataset == datasets[1]:
+    elif dataset == datasets[1]:
         # gets the iris data
         from sklearn.datasets import load_iris
         data, target = load_iris(True)
-    if dataset == datasets[2]:
+    elif dataset == datasets[2]:
         # gets the breast cancer data
         from sklearn.datasets import load_breast_cancer
         breast = load_breast_cancer()
         data = breast['data']
         target = breast['target']
-    if 2 < current_dataset_index < 8:
+    elif 2 < current_dataset_index < 8:
         # polish companies
         # https://archive.ics.uci.edu/ml/datasets/Polish+companies+bankruptcy+data
         data, target = load_polish(current_dataset_index-2)
-    if current_dataset_index == 8:
+    elif current_dataset_index == 8:
         # load diabetic dataset
         # https://archive.ics.uci.edu/ml/datasets/Diabetic+Retinopathy+Debrecen+Data+Set
         data,target = load_arff(r"C:\temp\thesis_data\messidor_features.arff")
-    if current_dataset_index == 9:
+    elif current_dataset_index == 9:
         # http://archive.ics.uci.edu/ml/datasets/Adult
         data,target = load_adult()
-    if current_dataset_index == 10:
+    elif current_dataset_index == 10:
         # http://archive.ics.uci.edu/ml/datasets/Dorothea
         data,target = load_dorothea()
+    elif current_dataset_index == 11:
+        # https://archive.ics.uci.edu/ml/datasets/Covertype
+        data,target = load_cover()
     return data, target
 
 data, target = get_data(dataset)
@@ -126,27 +137,26 @@ def accuracy_for_pair(label0, label1, epsilon=0.001, depth=5):
     if is_tree:
         tree_classifier = tree.DecisionTreeClassifier(max_depth=depth)
     else:
-        tree_classifier = TreeClassifier(epsilon, depth, normalizer_mode="norm", feature_drop_probability=0.0)
+        tree_classifier = TreeClassifier(epsilon, depth, normalizer_mode="dropSize", print_debug=False, fit_full_tree=True)
     return cross_val_score(tree_classifier, X, y, cv=5)
 
-# print accuracy_for_pair(3, 5, depth=45)
-
-for is_tree in [True, False]:
-    f = open(r"C:\temp\{}_{}_{}.txt".format(dataset, depth_of_tree, is_tree), "w")
-    number_of_classes = np.max(target).astype(int) + 1
-    print 'number of classes {}'.format(number_of_classes)
-    means = []
-    for i in range(number_of_classes):
-        for j in range(i+1, number_of_classes):
-            print (i,j)
-            scores = accuracy_for_pair(i, j, depth=5)
-            f.write(str((i, j)))
-            f.write(' ')
-            f.write(str(scores))
-            f.write(' ')
-            f.write(str(np.mean(scores)))
-            f.write('\n')
-            means += [np.mean(scores)]
-    f.write(str(np.mean(means)))
-    f.close()
-
+for depth_of_tree in depths_of_tree:
+    for is_tree in [True, False]:
+    # for is_tree in [False]:
+        f = open(r"C:\temp\{}_{}_{}.txt".format(dataset, depth_of_tree, is_tree), "w")
+        number_of_classes = np.max(target).astype(int) + 1
+        print 'number of classes {}'.format(number_of_classes)
+        means = []
+        for i in range(number_of_classes):
+            for j in range(i+1, number_of_classes):
+                print (i,j)
+                scores = accuracy_for_pair(i, j, depth=depth_of_tree)
+                f.write(str((i, j)))
+                f.write(' ')
+                f.write(str(scores))
+                f.write(' ')
+                f.write(str(np.mean(scores)))
+                f.write('\n')
+                means += [np.mean(scores)]
+        f.write(str(np.mean(means)))
+        f.close()

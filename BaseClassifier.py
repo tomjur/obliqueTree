@@ -47,6 +47,34 @@ class NormOneNormalizer(DataNormalizer):
         return self.normalize_data(data)
 
 
+class DropSizeNormalizer(DataNormalizer):
+
+    def __init__(self):
+        super(DropSizeNormalizer, self).__init__()
+        self.data_mean = None
+
+    def normalize_data(self, data):
+        # subtract mean
+        data = np.subtract(data, self.data_mean)
+        # add coordinate to match scale of data
+        # res = np.concatenate((data, np.ones((data.shape[0], 1))), axis=1)
+        # normalize
+        row_squared_sums = np.reshape(np.sqrt(np.square(data).sum(axis=1)), (-1, 1))
+        res = np.divide(data, row_squared_sums)
+        # add bias coordinate
+        res = np.concatenate((res, np.ones((data.shape[0], 1))), axis=1)
+        # normalize
+        res = np.divide(res, np.sqrt(2.0))
+        return res
+
+    def normalize_test(self, data):
+        return self.normalize_data(data)
+
+    def normalize_train(self, data):
+        self.data_mean = data.mean(axis=0)
+        return self.normalize_data(data)
+
+
 class JustBiasNormalizer(DataNormalizer):
 
     def __init__(self):
@@ -292,6 +320,8 @@ class BaseClassifier:
         # root = np.sqrt(np.max([0, a_norm_sqr - np.square(c)]))
         current_w_term1 = np.dot(c.reshape((-1,1)), w_term1.reshape((1,-1)))
         current_w_term2 = np.dot(root.reshape((-1,1)), w_term2.reshape((1,-1)))
+        # current_w_term1 = np.outer(c.reshape((-1,1)), w_term1.reshape((-1,1)))
+        # current_w_term2 = np.outer(root.reshape((-1,1)), w_term2.reshape((-1,1)))
         w1 = np.add(current_w_term1, current_w_term2)
         w2 = np.subtract(current_w_term1, current_w_term2)
         w = np.concatenate([w1,w2])
@@ -303,6 +333,7 @@ class BaseClassifier:
         self.g = g[best_index]
 
         # pair_candidates = []
+        # print 'slow mode'
         # for p in p_candidates:
         #     c = 2.0*p - 1.0
         #     root = np.sqrt(np.max([0, a_norm_sqr - np.square(c)]))
