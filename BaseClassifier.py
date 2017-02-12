@@ -314,44 +314,44 @@ class BaseClassifier:
 
         p_candidates = self.generate_p_candidates(lower_p, upper_p, must_occur)
 
-        p = np.array(p_candidates)
-        c = 2.0*p - 1.0
-        root = np.sqrt(np.max(np.concatenate([np.zeros([len(c),1]), (a_norm_sqr - np.square(c)).reshape(-1,1)],axis=1),axis=1))
-        # root = np.sqrt(np.max([0, a_norm_sqr - np.square(c)]))
-        current_w_term1 = np.dot(c.reshape((-1,1)), w_term1.reshape((1,-1)))
-        current_w_term2 = np.dot(root.reshape((-1,1)), w_term2.reshape((1,-1)))
-        # current_w_term1 = np.outer(c.reshape((-1,1)), w_term1.reshape((-1,1)))
-        # current_w_term2 = np.outer(root.reshape((-1,1)), w_term2.reshape((-1,1)))
-        w1 = np.add(current_w_term1, current_w_term2)
-        w2 = np.subtract(current_w_term1, current_w_term2)
-        w = np.concatenate([w1,w2])
-        p = np.concatenate([p,p])
-        q = np.divide(np.add(np.dot(w, self.b), self.m), 2.0)
-        g = self.get_weighted_ginni(p, q)
-        best_index = np.argmin(g)
-        self.w = w[best_index, :].reshape(-1)
-        self.g = g[best_index]
+        # p = np.array(p_candidates)
+        # c = 2.0*p - 1.0
+        # root = np.sqrt(np.max(np.concatenate([np.zeros([len(c),1]), (a_norm_sqr - np.square(c)).reshape(-1,1)],axis=1),axis=1))
+        # # root = np.sqrt(np.max([0, a_norm_sqr - np.square(c)]))
+        # current_w_term1 = np.dot(c.reshape((-1,1)), w_term1.reshape((1,-1)))
+        # current_w_term2 = np.dot(root.reshape((-1,1)), w_term2.reshape((1,-1)))
+        # # current_w_term1 = np.outer(c.reshape((-1,1)), w_term1.reshape((-1,1)))
+        # # current_w_term2 = np.outer(root.reshape((-1,1)), w_term2.reshape((-1,1)))
+        # w1 = np.add(current_w_term1, current_w_term2)
+        # w2 = np.subtract(current_w_term1, current_w_term2)
+        # w = np.concatenate([w1,w2])
+        # p = np.concatenate([p,p])
+        # q = np.divide(np.add(np.dot(w, self.b), self.m), 2.0)
+        # g = self.get_weighted_ginni(p, q)
+        # best_index = np.argmin(g)
+        # self.w = w[best_index, :].reshape(-1)
+        # self.g = g[best_index]
 
-        # pair_candidates = []
-        # print 'slow mode'
-        # for p in p_candidates:
-        #     c = 2.0*p - 1.0
-        #     root = np.sqrt(np.max([0, a_norm_sqr - np.square(c)]))
-        #     current_w_term1 = np.multiply(c, w_term1)
-        #     current_w_term2 = np.multiply(root, w_term2)
-        #     pair_candidates += [(p,np.add(current_w_term1, current_w_term2))]
-        #     pair_candidates += [(p,np.subtract(current_w_term1, current_w_term2))]
-        #
-        # def extend_with_q_and_ginni(p, w):
-        #     q = np.divide(np.add(np.dot(self.b, w), self.m), 2.0)
-        #     g = self.get_weighted_ginni(p, q)
-        #     return g, p, q, w.ravel()
-        # pair_candidates = [extend_with_q_and_ginni(p, w) for p, w in pair_candidates]
-        #
-        # best_index = np.argmin([x[0] for x in pair_candidates])
-        # best = pair_candidates[best_index]
-        # self.w = best[3]
-        # self.g = best[0]
+        pair_candidates = []
+        print 'slow mode'
+        for p in p_candidates:
+            c = 2.0*p - 1.0
+            root = np.sqrt(np.max([0, a_norm_sqr - np.square(c)]))
+            current_w_term1 = np.multiply(c, w_term1)
+            current_w_term2 = np.multiply(root, w_term2)
+            pair_candidates += [(p,np.add(current_w_term1, current_w_term2))]
+            pair_candidates += [(p,np.subtract(current_w_term1, current_w_term2))]
+
+        def extend_with_q_and_ginni(p, w):
+            q = np.divide(np.add(np.dot(self.b, w), self.m), 2.0)
+            g = self.get_weighted_ginni(p, q)
+            return g, p, q, w.ravel()
+        pair_candidates = [extend_with_q_and_ginni(p, w) for p, w in pair_candidates]
+
+        best_index = np.argmin([x[0] for x in pair_candidates])
+        best = pair_candidates[best_index]
+        self.w = best[3]
+        self.g = best[0]
 
     def approximate_solver(self, data, labels, data_dist):
         self.set_globals(data, labels, data_dist)
