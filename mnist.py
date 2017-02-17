@@ -1,16 +1,20 @@
 from TreeClassifier import *
-from sklearn.model_selection import cross_val_score
+# from sklearn.model_selection import cross_val_score
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
 from sklearn import tree
 import numpy as np
 
 datasets = ['mnist', 'iris', 'breast_cancer', 'polish_companies_y1', 'polish_companies_y2', #5
             'polish_companies_y3', 'polish_companies_y4', 'polish_companies_y5', 'diabetic_retinopathy_debrecen', #9
-            'adult', 'dorothea', 'cover']
-current_dataset_index = 11
-depths_of_tree = [1, 3, 5, 10]
+            'adult', 'dorothea', 'cover'] # adult + cover are bad CART gets ~1.0
+current_dataset_index = 8
+# depths_of_tree = [1, 3, 5, 10]
+depths_of_tree = [3,5,7]
 # depth_of_tree = 1
 
 dataset = datasets[current_dataset_index]
+
 
 def load_arff(filepath):
     from scipy.io.arff import loadarff
@@ -134,16 +138,28 @@ def create_data_matrix(label0, label1):
 
 def accuracy_for_pair(label0, label1, epsilon=0.001, depth=5):
     X, y = create_data_matrix(label0, label1)
-    if is_tree:
-        tree_classifier = tree.DecisionTreeClassifier(max_depth=depth)
-    else:
-        tree_classifier = TreeClassifier(epsilon, depth, normalizer_mode="dropSize", print_debug=False, fit_full_tree=True)
-    return cross_val_score(tree_classifier, X, y, cv=5)
+    res = []
+    split = 3
+    for i in range(split):
+        slice_size = (i+1)*len(y)/float(split)
+        indices = np.random.permutation(len(y))[:int(slice_size)]
+        sliced_data = X[indices, :]
+        sliced_labels = y[indices]
+        X_train, X_test, y_train, y_test = train_test_split(sliced_data, sliced_labels, test_size=0.2, random_state=0)
+        if is_tree:
+            tree_classifier = tree.DecisionTreeClassifier(max_depth=depth)
+        else:
+            # tree_classifier = TreeClassifier(epsilon, depth, normalizer_mode="dropSize", print_debug=False, fit_full_tree=True)
+            tree_classifier = TreeClassifier(epsilon, depth, normalizer_mode="evalMode", print_debug=False, fit_full_tree=True)
+        tree_classifier.fit(X_train, y_train)
+        res.append((i, accuracy_score(y_test, tree_classifier.predict(X_test))))
+    return res
+    # return cross_val_score(tree_classifier, X, y, cv=5)
 
 for depth_of_tree in depths_of_tree:
     for is_tree in [True, False]:
-    # for is_tree in [False]:
-        f = open(r"C:\temp\{}_{}_{}.txt".format(dataset, depth_of_tree, is_tree), "w")
+    # for is_tree in [True]:
+        f = open(r"C:\temp\small\{}_{}_{}.txt".format(dataset, depth_of_tree, is_tree), "w")
         number_of_classes = np.max(target).astype(int) + 1
         print 'number of classes {}'.format(number_of_classes)
         means = []
@@ -155,8 +171,8 @@ for depth_of_tree in depths_of_tree:
                 f.write(' ')
                 f.write(str(scores))
                 f.write(' ')
-                f.write(str(np.mean(scores)))
+                # f.write(str(np.mean(scores)))
                 f.write('\n')
-                means += [np.mean(scores)]
-        f.write(str(np.mean(means)))
+                # means += [np.mean(scores)]
+        # f.write(str(np.mean(means)))
         f.close()

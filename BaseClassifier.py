@@ -122,6 +122,48 @@ class RangeNormalizer(DataNormalizer):
         return self.normalize_test(data)
 
 
+class GenericNormalizer(DataNormalizer):
+
+    def __init__(self, reduce_mean=True, divide_by_std=True, normalize_to_one=True, size_coordinate=False, bias_coordinate=True):
+        super(GenericNormalizer, self).__init__()
+        self.reduce_mean = reduce_mean
+        self.divide_by_std = divide_by_std
+        self.normalize_to_one = normalize_to_one
+        self.size_coordinate = size_coordinate
+        self.bias_coordinate = bias_coordinate
+
+        self.data_mean = None
+        self.data_std = None
+
+    def normalize_test(self, data):
+        res = data
+        if self.reduce_mean:
+            res = np.subtract(res, self.data_mean)
+        if self.divide_by_std:
+            res = np.divide(res, self.data_std)
+        if self.normalize_to_one:
+            if self.size_coordinate:
+                # add coordinate to match scale of data
+                res = np.concatenate((res, np.ones((res.shape[0], 1))), axis=1)
+            # normalize
+            row_squared_sums = np.reshape(np.sqrt(np.square(res).sum(axis=1)), (-1, 1))
+            res = np.divide(res, row_squared_sums)
+        if self.bias_coordinate:
+            # add bias coordinate
+            res = np.concatenate((res, np.ones((data.shape[0], 1))), axis=1)
+            # normalize
+            if self.normalize_to_one:
+                res = np.divide(res, np.sqrt(2.0))
+        return res
+
+    def normalize_train(self, data):
+        if self.reduce_mean:
+            self.data_mean = data.mean(axis=0)
+        if self.divide_by_std:
+            self.data_std = data.std(axis=0)
+        return self.normalize_test(data)
+
+
 class BaseClassifier:
 
     def __init__(self, epsilon, inter_cell_bound=100, algorithm_mode=None):
@@ -314,44 +356,44 @@ class BaseClassifier:
 
         p_candidates = self.generate_p_candidates(lower_p, upper_p, must_occur)
 
-        # p = np.array(p_candidates)
-        # c = 2.0*p - 1.0
-        # root = np.sqrt(np.max(np.concatenate([np.zeros([len(c),1]), (a_norm_sqr - np.square(c)).reshape(-1,1)],axis=1),axis=1))
-        # # root = np.sqrt(np.max([0, a_norm_sqr - np.square(c)]))
-        # current_w_term1 = np.dot(c.reshape((-1,1)), w_term1.reshape((1,-1)))
-        # current_w_term2 = np.dot(root.reshape((-1,1)), w_term2.reshape((1,-1)))
-        # # current_w_term1 = np.outer(c.reshape((-1,1)), w_term1.reshape((-1,1)))
-        # # current_w_term2 = np.outer(root.reshape((-1,1)), w_term2.reshape((-1,1)))
-        # w1 = np.add(current_w_term1, current_w_term2)
-        # w2 = np.subtract(current_w_term1, current_w_term2)
-        # w = np.concatenate([w1,w2])
-        # p = np.concatenate([p,p])
-        # q = np.divide(np.add(np.dot(w, self.b), self.m), 2.0)
-        # g = self.get_weighted_ginni(p, q)
-        # best_index = np.argmin(g)
-        # self.w = w[best_index, :].reshape(-1)
-        # self.g = g[best_index]
+        p = np.array(p_candidates)
+        c = 2.0*p - 1.0
+        root = np.sqrt(np.max(np.concatenate([np.zeros([len(c),1]), (a_norm_sqr - np.square(c)).reshape(-1,1)],axis=1),axis=1))
+        # root = np.sqrt(np.max([0, a_norm_sqr - np.square(c)]))
+        current_w_term1 = np.dot(c.reshape((-1,1)), w_term1.reshape((1,-1)))
+        current_w_term2 = np.dot(root.reshape((-1,1)), w_term2.reshape((1,-1)))
+        # current_w_term1 = np.outer(c.reshape((-1,1)), w_term1.reshape((-1,1)))
+        # current_w_term2 = np.outer(root.reshape((-1,1)), w_term2.reshape((-1,1)))
+        w1 = np.add(current_w_term1, current_w_term2)
+        w2 = np.subtract(current_w_term1, current_w_term2)
+        w = np.concatenate([w1,w2])
+        p = np.concatenate([p,p])
+        q = np.divide(np.add(np.dot(w, self.b), self.m), 2.0)
+        g = self.get_weighted_ginni(p, q)
+        best_index = np.argmin(g)
+        self.w = w[best_index, :].reshape(-1)
+        self.g = g[best_index]
 
-        pair_candidates = []
-        print 'slow mode'
-        for p in p_candidates:
-            c = 2.0*p - 1.0
-            root = np.sqrt(np.max([0, a_norm_sqr - np.square(c)]))
-            current_w_term1 = np.multiply(c, w_term1)
-            current_w_term2 = np.multiply(root, w_term2)
-            pair_candidates += [(p,np.add(current_w_term1, current_w_term2))]
-            pair_candidates += [(p,np.subtract(current_w_term1, current_w_term2))]
-
-        def extend_with_q_and_ginni(p, w):
-            q = np.divide(np.add(np.dot(self.b, w), self.m), 2.0)
-            g = self.get_weighted_ginni(p, q)
-            return g, p, q, w.ravel()
-        pair_candidates = [extend_with_q_and_ginni(p, w) for p, w in pair_candidates]
-
-        best_index = np.argmin([x[0] for x in pair_candidates])
-        best = pair_candidates[best_index]
-        self.w = best[3]
-        self.g = best[0]
+        # pair_candidates = []
+        # print 'slow mode'
+        # for p in p_candidates:
+        #     c = 2.0*p - 1.0
+        #     root = np.sqrt(np.max([0, a_norm_sqr - np.square(c)]))
+        #     current_w_term1 = np.multiply(c, w_term1)
+        #     current_w_term2 = np.multiply(root, w_term2)
+        #     pair_candidates += [(p,np.add(current_w_term1, current_w_term2))]
+        #     pair_candidates += [(p,np.subtract(current_w_term1, current_w_term2))]
+        #
+        # def extend_with_q_and_ginni(p, w):
+        #     q = np.divide(np.add(np.dot(self.b, w), self.m), 2.0)
+        #     g = self.get_weighted_ginni(p, q)
+        #     return g, p, q, w.ravel()
+        # pair_candidates = [extend_with_q_and_ginni(p, w) for p, w in pair_candidates]
+        #
+        # best_index = np.argmin([x[0] for x in pair_candidates])
+        # best = pair_candidates[best_index]
+        # self.w = best[3]
+        # self.g = best[0]
 
     def approximate_solver(self, data, labels, data_dist):
         self.set_globals(data, labels, data_dist)

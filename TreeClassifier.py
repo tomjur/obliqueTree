@@ -113,6 +113,8 @@ class TreeClassifier(BaseEstimator, ClassifierMixin):
         elif self.normalizer_mode == "dropSize":
             print 'drop size feature'
             self.normalizer = DropSizeNormalizer()
+        elif self.normalizer_mode == "evalMode":
+            self.normalizer = GenericNormalizer()
         else:
             print 'full normalization'
             self.normalizer = NormOneNormalizer()
@@ -238,7 +240,7 @@ def run_main():
     # X, y = create_data_simulation_middle()
     X, y = create_data_simulation_xor()
     # X, y = create_sized_data()
-    treeClassifier = TreeClassifier(0.05, 15, normalizer_mode="norm", print_debug=False)
+    treeClassifier = TreeClassifier(0.05, 15, normalizer_mode="evalMode", print_debug=False)
     treeClassifier.fit(X, y)
 
     x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
