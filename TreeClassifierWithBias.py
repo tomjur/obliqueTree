@@ -4,11 +4,11 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 
 
-class TreeNode:
+class TreeNodeWithBias:
 
-    def __init__(self, data, data_dist, labels, epsilon):
+    def __init__(self, bias_to_data, data_dist, labels, epsilon):
         # data
-        self.data = data
+        self.bias_to_data = bias_to_data
         self.data_dist = data_dist
         self.labels = labels
         self.epsilon = epsilon
@@ -18,6 +18,7 @@ class TreeNode:
         self.right = None
         self.is_leaf = True
         self.classifier = None
+        self.bias = None
         self.gain = 0.0
         self.weight = data_dist.sum()
 
@@ -31,16 +32,28 @@ class TreeNode:
         normalized_data_dist = np.divide(self.data_dist, self.weight)
         normalized_epsilon = self.epsilon / self.weight
         normalized_epsilon = np.min([0.5, normalized_epsilon, 10*self.epsilon])
-        self.classifier = BaseClassifier(normalized_epsilon)
-        self.classifier.approximate_solver(self.data, self.labels, normalized_data_dist)
-        self.gain = self.weight*(self.classifier.get_ginni(self.m) - self.classifier.g)
+        bias_unset=True
+        gains = []
+        for bias in self.bias_to_data:
+            classifier = BaseClassifier(normalized_epsilon)
+            classifier.approximate_solver(self.bias_to_data[bias], self.labels, normalized_data_dist)
+            gain = self.weight*(classifier.get_ginni(self.m) - classifier.g)
+            gains.append(gain)
+            if np.greater(gain, self.gain):
+                # set classifier if better
+                self.classifier = classifier
+                self.gain = gain
+                self.bias = bias
+                bias_unset = False
+        if bias_unset:
+            print gains
 
     def set_as_internal(self):
-        pl1 = self.classifier.get_probabilities(self.data)
+        pl1 = self.classifier.get_probabilities(self.bias_to_data[self.bias])
         pl0 = np.subtract(1.0, pl1)
         self.is_leaf = False
-        self.left = TreeNode(self.data, np.multiply(self.data_dist, pl1), self.labels, self.epsilon)
-        self.right = TreeNode(self.data, np.multiply(self.data_dist, pl0), self.labels, self.epsilon)
+        self.left = TreeNodeWithBias(self.bias_to_data, np.multiply(self.data_dist, pl1), self.labels, self.epsilon)
+        self.right = TreeNodeWithBias(self.bias_to_data, np.multiply(self.data_dist, pl0), self.labels, self.epsilon)
         return self.left, self.right
 
     def get_gain(self):
@@ -49,51 +62,35 @@ class TreeNode:
         self.set_classifier()
         return self.gain
 
-    def get_probabilities(self, data, depth=-1):
+    def get_probabilities(self, bias_to_data, depth=-1):
         if self.is_leaf or depth == 0:
-            # my_label = np.greater_equal(self.m, 0.5) * 1.0
-            # return np.multiply(np.ones((data.shape[0])), my_label)
-            return np.multiply(np.ones((data.shape[0])), self.m)
+            return np.multiply(np.ones(bias_to_data[bias_to_data.keys()[0]].shape[0]), self.m)
+
+        data = bias_to_data[self.bias]
         current_probabilities = self.classifier.get_probabilities(data)
-        left = np.multiply(current_probabilities, self.left.get_probabilities(data, depth=depth - 1))
+        left = np.multiply(current_probabilities, self.left.get_probabilities(bias_to_data, depth=depth - 1))
         right = np.multiply(np.subtract(1.0, current_probabilities),
-                            self.right.get_probabilities(data, depth=depth - 1))
+                            self.right.get_probabilities(bias_to_data, depth=depth - 1))
         return np.add(left, right)
 
-    def predict_deterministic(self, data, depth=-1):
-        return np.greater_equal(self.get_probabilities(data, depth), 0.5)
-        # # check if there is data
-        # if data.shape[0] == 0:
-        #     return []
-        # if self.is_leaf:
-        #     return np.multiply(self.label, np.ones((data.shape[0], 1)))
-        # # response for each sample
-        # i = self.classifier.predict_deterministic(data)
-        # res = np.multiply(np.ones((data.shape[0], 1)), -1.0)
-        # if i.sum() > 0.0:
-        #     data_left = data[i == 1, :]
-        #     left = self.left.predict_deterministic(data_left)
-        #     res[i == 1] = left
-        # if i.sum() < data.shape[0]:
-        #     data_right = data[i == 0, :]
-        #     right = self.right.predict_deterministic(data_right)
-        #     res[i == 0] = right
-        # return res
+    def predict_deterministic(self, bias_to_data, depth=-1):
+        return np.greater_equal(self.get_probabilities(bias_to_data, depth), 0.5)
 
-    def predict_stochastic(self, data, depth=-1):
-        current_probabilities = self.get_probabilities(data, depth)
+    def predict_stochastic(self, bias_to_data, depth=-1):
+        current_probabilities = self.get_probabilities(bias_to_data, depth)
         random_coin = np.random.uniform(0.0, 1.0, current_probabilities.shape)
         return np.greater_equal(current_probabilities, random_coin)
 
 
-class TreeClassifier(BaseEstimator, ClassifierMixin):
+class TreeClassifierWithBias(BaseEstimator, ClassifierMixin):
 
-    def __init__(self, epsilon=0.001, number_of_iterations=5, normalizer_mode=None, fit_full_tree=False, print_debug=True):
+    def __init__(self, epsilon=0.001, number_of_iterations=5, fit_full_tree=False, print_debug=True, normalize_to_one=True):
         # hyper parameters
         self.epsilon = epsilon
         self.number_of_iterations = number_of_iterations
-        self.normalizer_mode = normalizer_mode
-        self.normalizer = None
+        self.normalize_to_one = normalize_to_one
+        self.initial_normalizer = None
+        self.normalizers = None
 
         self.fit_full_tree = fit_full_tree
         self.print_debug = print_debug
@@ -101,35 +98,32 @@ class TreeClassifier(BaseEstimator, ClassifierMixin):
         # model
         self.root = None
 
-    def set_normalizer(self):
-        if self.normalizer is not None:
+    def set_normalizers(self,data):
+        if self.normalizers is not None:
             return
-        if self.normalizer_mode == "range":
-            print 'range'
-            self.normalizer = RangeNormalizer()
-        elif self.normalizer_mode == "no":
-            print 'just bias'
-            self.normalizer = JustBiasNormalizer()
-        elif self.normalizer_mode == "dropSize":
-            print 'drop size feature'
-            self.normalizer = DropSizeNormalizer()
-        elif self.normalizer_mode == "evalMode":
-            self.normalizer = GenericNormalizer()
-        else:
-            print 'full normalization'
-            self.normalizer = NormOneNormalizer()
+        self.initial_normalizer = GenericNormalizer(reduce_mean=True, divide_by_std=True,
+                                                    bias_coordinate=0.0, normalize_to_one=self.normalize_to_one)
+        norm_data = self.initial_normalizer.normalize_train(data)
+        data_min = np.min(np.abs(norm_data))
+        data_max = np.max(np.abs(norm_data))
+        self.normalizers = {}
+        while np.less(data_min, 10*data_max):
+            self.normalizers[data_min] = GenericNormalizer(reduce_mean=False, divide_by_std=False,
+                                                           bias_coordinate=data_min, normalize_to_one=self.normalize_to_one)
+            data_min *= 10.0
 
     def fit(self, data, labels):
-        self.set_normalizer()
-        norm_data = self.normalizer.normalize_train(data)
+        self.set_normalizers(data)
+        data = self.initial_normalizer.normalize_test(data)
+        bias_to_data = {b:self.normalizers[b].normalize_train(data) for b in self.normalizers}
         if self.fit_full_tree:
-            return self.fit2(norm_data, labels)
-        return self.fit1(norm_data, labels)
+            return self.fit2(bias_to_data , labels)
+        return self.fit1(bias_to_data , labels)
 
-    def fit1(self, data, labels):
+    def fit1(self, bias_to_data, labels):
         # initial data distribution
-        data_dist = np.ones(labels.shape) / data.shape[0]
-        root = TreeNode(data, data_dist, labels, self.epsilon)
+        data_dist = np.ones(labels.shape) / labels.shape[0]
+        root = TreeNodeWithBias(bias_to_data, data_dist, labels, self.epsilon)
         leaves = [root]
         for t in range(0, self.number_of_iterations):
             if self.print_debug:
@@ -157,14 +151,14 @@ class TreeClassifier(BaseEstimator, ClassifierMixin):
             leaves.extend([l, r])
         self.root = root
 
-    def fit2(self, data, labels):
-        data_dist = np.ones(labels.shape) / data.shape[0]
-        root = TreeNode(data, data_dist, labels, self.epsilon)
+    def fit2(self, bias_to_data, labels):
+        data_dist = np.ones(labels.shape) / labels.shape[0]
+        root = TreeNodeWithBias(bias_to_data, data_dist, labels, self.epsilon)
         self.recursive_fit(self.number_of_iterations, root)
         self.root = root
 
     def recursive_fit(self, levels, tree_node):
-        if tree_node.weight < (1.0 / tree_node.data.shape[0]) or levels < 2:
+        if tree_node.weight < (1.0 / tree_node.labels.shape[0]) or levels < 2:
             if self.print_debug:
                 print "stopping level {}".format(levels)
             return
@@ -180,10 +174,10 @@ class TreeClassifier(BaseEstimator, ClassifierMixin):
         self.recursive_fit(levels-1, r)
 
     def predict_deterministic(self, data, depth=-1):
-        return self.root.predict_deterministic(self.normalizer.normalize_test(data), depth)
+        return self.root.predict_deterministic({b:self.normalizers[b].normalize_test(data) for b in self.normalizers}, depth)
 
     def predict_stochastic(self, data, depth=-1):
-        return self.root.predict_stochastic(self.normalizer.normalize_test(data), depth)
+        return self.root.predict_stochastic({b:self.normalizers[b].normalize_test(data) for b in self.normalizers}, depth)
 
     def predict(self, data, y=None):
         return self.predict_deterministic(data)
@@ -240,7 +234,7 @@ def run_main():
     # X, y = create_data_simulation_middle()
     X, y = create_data_simulation_xor()
     # X, y = create_sized_data()
-    treeClassifier = TreeClassifier(0.05, 7, normalizer_mode="evalMode", print_debug=False)
+    treeClassifier = TreeClassifierWithBias(0.05, 3, print_debug=False, normalize_to_one=True)
     treeClassifier.fit(X, y)
 
     x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1

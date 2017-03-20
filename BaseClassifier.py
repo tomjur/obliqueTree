@@ -124,7 +124,7 @@ class RangeNormalizer(DataNormalizer):
 
 class GenericNormalizer(DataNormalizer):
 
-    def __init__(self, reduce_mean=True, divide_by_std=True, normalize_to_one=True, size_coordinate=False, bias_coordinate=True):
+    def __init__(self, reduce_mean=True, divide_by_std=True, normalize_to_one=True, size_coordinate=False, bias_coordinate=1.0):
         super(GenericNormalizer, self).__init__()
         self.reduce_mean = reduce_mean
         self.divide_by_std = divide_by_std
@@ -150,10 +150,11 @@ class GenericNormalizer(DataNormalizer):
             res = np.divide(res, row_squared_sums)
         if self.bias_coordinate:
             # add bias coordinate
-            res = np.concatenate((res, np.ones((data.shape[0], 1))), axis=1)
+            res = np.concatenate((res, self.bias_coordinate*np.ones((res.shape[0], 1))), axis=1)
             # normalize
             if self.normalize_to_one:
-                res = np.divide(res, np.sqrt(2.0))
+                row_squared_sums = np.reshape(np.sqrt(np.square(res).sum(axis=1)), (-1, 1))
+                res = np.divide(res, row_squared_sums)
         return res
 
     def normalize_train(self, data):

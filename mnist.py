@@ -1,4 +1,6 @@
+import TreeClassifierWithBias
 from TreeClassifier import *
+from TreeClassifierWithBias import *
 # from sklearn.model_selection import cross_val_score
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
@@ -139,7 +141,7 @@ def create_data_matrix(label0, label1):
 def accuracy_for_pair(label0, label1, epsilon=0.001, depth=5):
     X, y = create_data_matrix(label0, label1)
     res = []
-    split = 3
+    split = 1
     for i in range(split):
         slice_size = (i+1)*len(y)/float(split)
         indices = np.random.permutation(len(y))[:int(slice_size)]
@@ -150,7 +152,8 @@ def accuracy_for_pair(label0, label1, epsilon=0.001, depth=5):
             tree_classifier = tree.DecisionTreeClassifier(max_depth=depth)
         else:
             # tree_classifier = TreeClassifier(epsilon, depth, normalizer_mode="dropSize", print_debug=False, fit_full_tree=True)
-            tree_classifier = TreeClassifier(epsilon, depth, normalizer_mode="evalMode", print_debug=False, fit_full_tree=True)
+            # tree_classifier = TreeClassifier(epsilon, depth, normalizer_mode="evalMode", print_debug=False, fit_full_tree=True)
+            tree_classifier = TreeClassifierWithBias(epsilon, depth, print_debug=False, fit_full_tree=True)
         tree_classifier.fit(X_train, y_train)
         res.append((i, accuracy_score(y_test, tree_classifier.predict(X_test))))
     return res
